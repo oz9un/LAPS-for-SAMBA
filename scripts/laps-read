@@ -1,0 +1,59 @@
+#!/bin/bash
+
+# Check if argument is given:
+if [ $# -eq 0 ]; then
+	echo "Please give DN name as an argument. E.g: CN=PARDUS102,OU=Domain Controllers,DC=staj,DC=lab"
+	exit 1
+fi
+
+# Get DN name as argument.
+DN=$@
+
+MODIFY_NTSECDESC="dn: ${DN}\nchangetype: modify\nreplace: nTSecurityDescriptor\nnTSecurityDescriptor:O:DAG:DAD:ARAI(A;;RPWPCRCCDCLCLORCWOWDSDDTSW;;;DA)(A;;RP\n
+ LCLORC;;;AU)(A;;CCDC;;;PS)(A;;RPWPCRCCDCLCLORCWOWDSDDTSW;;;AO)(A;;RPWPCRCCDCL\n
+ CLORCWOWDSDDTSW;;;SY)(A;CI;WP;;;PS)(OA;;RP;46a9b11d-60ae-405a-b7e8-ff8a58d456\n
+ d2;;S-1-5-32-560)(OA;;CR;ab721a53-1e2f-11d0-9819-00aa0040529b;;WD)(OA;;CCDC;b\n
+ f967aa8-0de6-11d0-a285-00aa003049e2;;PO)(OA;;RPWP;bf967a7f-0de6-11d0-a285-00a\n
+ a003049e2;;CA)(OA;;SW;f3a64788-5306-11d1-a9c5-0000f80367c1;;PS)(OA;;RPWP;77b5\n
+ b886-944a-11d1-aebd-0000f80367c1;;PS)(OA;;SW;72e39547-7b18-11d1-adef-00c04fd8\n
+ d5cd;;PS)(OA;CI;RPWP;04ad32e9-4b2a-433e-809b-797b62f02291;;PS)(OA;CIIOID;RP;4\n
+ c164200-20c0-11d0-a768-00aa006e0529;4828cc14-1437-45bc-9b07-ad6f015e5f28;RU)(\n
+ OA;CIIOID;RP;4c164200-20c0-11d0-a768-00aa006e0529;bf967aba-0de6-11d0-a285-00a\n
+ a003049e2;RU)(OA;CIIOID;RP;5f202010-79a5-11d0-9020-00c04fc2d4cf;4828cc14-1437\n
+ -45bc-9b07-ad6f015e5f28;RU)(OA;CIIOID;RP;5f202010-79a5-11d0-9020-00c04fc2d4cf\n
+ ;bf967aba-0de6-11d0-a285-00aa003049e2;RU)(OA;CIIOID;RP;bc0ac240-79a9-11d0-902\n
+ 0-00c04fc2d4cf;4828cc14-1437-45bc-9b07-ad6f015e5f28;RU)(OA;CIIOID;RP;bc0ac240\n
+ -79a9-11d0-9020-00c04fc2d4cf;bf967aba-0de6-11d0-a285-00aa003049e2;RU)(OA;CIIO\n
+ ID;RP;59ba2f42-79a2-11d0-9020-00c04fc2d3cf;4828cc14-1437-45bc-9b07-ad6f015e5f\n
+ 28;RU)(OA;CIIOID;RP;59ba2f42-79a2-11d0-9020-00c04fc2d3cf;bf967aba-0de6-11d0-a\n
+ 285-00aa003049e2;RU)(OA;CIIOID;RP;037088f8-0ae1-11d2-b422-00a0c968f939;4828cc\n
+ 14-1437-45bc-9b07-ad6f015e5f28;RU)(OA;CIIOID;RP;037088f8-0ae1-11d2-b422-00a0c\n
+ 968f939;bf967aba-0de6-11d0-a285-00aa003049e2;RU)(OA;CIID;RP;b7c69e6d-2cc7-11d\n
+ 2-854e-00a0c983f608;bf967a86-0de6-11d0-a285-00aa003049e2;ED)(OA;CIIOID;RP;b7c\n
+ 69e6d-2cc7-11d2-854e-00a0c983f608;bf967a9c-0de6-11d0-a285-00aa003049e2;ED)(OA\n
+ ;CIIOID;RP;b7c69e6d-2cc7-11d2-854e-00a0c983f608;bf967aba-0de6-11d0-a285-00aa0\n
+ 03049e2;ED)(OA;CIIOID;RPLCLORC;;4828cc14-1437-45bc-9b07-ad6f015e5f28;RU)(OA;C\n
+ IIOID;RPLCLORC;;bf967a9c-0de6-11d0-a285-00aa003049e2;RU)(OA;CIIOID;RPLCLORC;;\n
+ bf967aba-0de6-11d0-a285-00aa003049e2;RU)(OA;CIID;RPWPCR;91e647de-d96f-4b70-95\n
+ 57-d63ff4f3ccd8;;PS)(A;CIID;RPWPCRCCDCLCLORCWOWDSDDTSW;;;EA)(A;CIID;LC;;;RU)(\n
+ A;CIID;RPWPCRCCLCLORCWOWDSDSW;;;BA)S:AI(OU;CIIOIDSA;WP;f30e3bbe-9ff0-11d1-b60\n
+ 3-0000f80367c1;bf967aa5-0de6-11d0-a285-00aa003049e2;WD)(OU;CIIOIDSA;WP;f30e3b\n
+ bf-9ff0-11d1-b603-0000f80367c1;bf967aa5-0de6-11d0-a285-00aa003049e2;WD)"
+
+# Create required files:
+echo -e $MODIFY_NTSECDESC > read_permission.ldif
+echo -e "\e[0;32m [+] \033[0;37m read_permission.ldif file is created."
+
+# Run ldb commands:
+echo -e "\n\e[0;32m [+] \033[0;37m ldbmodify for Read Permission started:"
+ldbmodify -H /var/lib/samba/private/sam.ldb --option="dsdb:schema update allowed"=true read_permission.ldif
+
+# Remove files:
+#rm read_permission.ldif
+
+echo -e "\n\e[0;32m [+] \033[0;37m ldif file is removed."
+
+# Restart Samba service:
+echo -e "\n\e[0;32m [+] \033[0;37m samba4 service is restarting."
+systemctl restart samba4
+

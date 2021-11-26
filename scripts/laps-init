@@ -1,0 +1,49 @@
+#!/bin/bash
+
+# Check if argument is given:
+if [ $# -eq 0 ]; then
+	echo "Please give DN name as an argument. E.g: CN=PARDUS102,OU=Domain Controllers,DC=staj,DC=lab"
+	exit 1
+fi
+
+# Get DN name as argument.
+DN=$@
+
+random_pass_generator() {
+	# Create random password:
+	PASSWORD_GENERATE='date +"%T.%3N" | base32 | sha256sum | base64 | head -c 25'
+	PASSWORD=$(eval $PASSWORD_GENERATE)
+}
+
+# Create random password:
+random_pass_generator
+
+# Define expiration time (3 Nov 1971 12:30 PM):
+EXP_TIME="117024822000000000"
+
+MODIFY_ADM_PWD="dn: ${DN}\nchangetype: modify\nreplace: ms-Mcs-AdmPwd\nms-Mcs-AdmPwd:$PASSWORD"
+MODIFY_ADM_PWD_EXPTIME="dn: ${DN}\nchangetype: modify\nreplace: ms-Mcs-AdmPwdExpirationTime\nms-Mcs-AdmPwdExpirationTime:$EXP_TIME"
+
+# Create required files:
+echo -e $MODIFY_ADM_PWD > modify_admpwd.ldif
+echo -e "\e[0;32m [+] \033[0;37m modify_admpwd.ldif file is created."
+
+echo -e $MODIFY_ADM_PWD_EXPTIME > modify_admpwdexptime.ldif
+echo -e "\e[0;32m [+] \033[0;37m modify_admpwdexptime.ldif file is created."
+
+# Run ldb commands:
+echo -e "\n\e[0;32m [+] \033[0;37m ldbmodify for AdmPwd started:"
+ldbmodify -H /var/lib/samba/private/sam.ldb --option="dsdb:schema update allowed"=true modify_admpwd.ldif
+echo -e "\e[0;32m [+] \033[0;37m ldbmodify fpr AdmPwdExpirationTime started:"
+ldbmodify -H /var/lib/samba/private/sam.ldb --option="dsdb:schema update allowed"=true modify_admpwdexptime.ldif
+
+# Remove files:
+rm modify_admpwd.ldif
+rm modify_admpwdexptime.ldif
+
+echo -e "\n\e[0;32m [+] \033[0;37m ldif files are removed."
+
+# Restart Samba service:
+echo -e "\n\e[0;32m [+] \033[0;37m samba4 service is restarting."
+systemctl restart samba4
+

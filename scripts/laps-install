@@ -1,0 +1,57 @@
+#!/bin/bash
+
+# Check if argument is given:
+if [ $# -eq 0 ]; then
+	echo "Please give DC name as an argument. E.g: ozg.winservdc.com"
+	exit 1
+fi
+
+
+# Get DC name as argument. E.g: ozg.winservdc.com
+DC_ARG=$1
+
+# Split the DC name with using delimiter: '.'
+DC_PARTS=(${DC_ARG//./ }) 
+
+# Final format of the DC. E.g: dc=ozg,dc=winservdc,dc=com
+DC_TO_REPLACE=""
+
+# Iterate over DC_PARTS; add to DC_TO_REPLACE
+for i in ${DC_PARTS[@]}; do
+	DC_TO_REPLACE="${DC_TO_REPLACE}dc=$i,"
+done
+
+# Delete the comma at the end:
+DC_TO_REPLACE=${DC_TO_REPLACE%?}
+
+# Set DNs:
+DN1_1="dn: CN=ms-Mcs-AdmPwd,CN=Schema,CN=Configuration,${DC_TO_REPLACE}"
+DN1_2="dn: CN=ms-Mcs-AdmPwdExpirationTime,CN=Schema,CN=Configuration,${DC_TO_REPLACE}"
+DN2="dn: CN=Computer,CN=Schema,CN=Configuration,${DC_TO_REPLACE}"
+
+LDIF_FILE_1="${DN1_1}\nchangetype: add\nobjectClass: attributeSchema\nldapDisplayName: ms-MCS-AdmPwd\nadminDisplayName: ms-MCS-AdmPwd\nadminDescription: Stores password of local Administrator account on workstation\nattributeId: 1.2.840.113556.1.8000.2554.50051.45980.28112.18903.35903.6685103.1224907.2.1\nattributeSyntax: 2.5.5.5\nomSyntax: 19\nisSingleValued: TRUE\nsystemOnly: FALSE\nsearchFlags: 648\nisMemberOfPartialAttributeSet: FALSE\nshowInAdvancedViewOnly: FALSE\n\n${DN1_2}\nchangetype: add\nobjectClass: attributeSchema\nldapDisplayName: ms-MCS-AdmPwdExpirationTime\nadminDisplayName: ms-MCS-AdmPwdExpirationTime\nadminDescription: Stores timestamp of last password change\nattributeId: 1.2.840.113556.1.8000.2554.50051.45980.28112.18903.35903.6685103.1224907.2.2\nattributeSyntax: 2.5.5.16\nomSyntax: 65\nisSingleValued: TRUE\nsystemOnly: FALSE\nsearchFlags: 0\nisMemberOfPartialAttributeSet: FALSE\nshowInAdvancedViewOnly: FALSE"
+
+LDIF_FILE_2="${DN2}\nchangetype: Modify\nadd: mayContain\nmayContain: ms-MCS-AdmPwd\nmayContain: ms-MCS-AdmPwdExpirationTime"
+
+# Create required files:
+echo -e $LDIF_FILE_1 > laps-1.ldif
+echo -e "\e[0;32m [+] \033[0;37m laps-1.ldif file is created."
+
+echo -e $LDIF_FILE_2 > laps-2.ldif
+echo -e "\e[0;32m [+] \033[0;37m laps-2.ldif file is created."
+
+# Run ldb commands:
+echo -e "\n\e[0;32m [+] \033[0;37m ldbadd started:"
+ldbadd -H /var/lib/samba/private/sam.ldb --option="dsdb:schema update allowed"=true laps-1.ldif
+echo -e "\e[0;32m [+] \033[0;37m ldbmodify started:"
+ldbmodify -H /var/lib/samba/private/sam.ldb --option="dsdb:schema update allowed"=true laps-2.ldif
+
+# Remove files:
+rm laps-1.ldif
+rm laps-2.ldif
+
+echo -e "\n\e[0;32m [+] \033[0;37m ldif files are removed."
+
+# Restart Samba service:
+echo -e "\n\e[0;32m [+] \033[0;37m samba4 service is restarting."
+systemctl restart samba4
