@@ -6,7 +6,7 @@ This repository includes scripts that should be executed on SAMBA DC machine in 
 For more information about LAPS, you can visit [Microsoft](https://www.microsoft.com/en-us/download/details.aspx?id=46899)'s page.
 
 
-## What are these scripts doing?
+## What are these scripts doing❓
 
 Implementation process of LAPS on SAMBA DC mainly consists of 3 scripts (*respectively*):
 
