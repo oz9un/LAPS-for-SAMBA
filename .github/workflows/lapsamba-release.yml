@@ -1,0 +1,101 @@
+name: Ozgun Demo
+on:
+  push:
+    branches: ["main"]
+
+jobs:
+  Deb-Builder:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout the code
+        uses: actions/checkout@v1
+      
+      - name: Get current date
+        id: date
+        run: echo "::set-output name=date::$(date +'%Y%m%d-%H%M%S')"
+
+      - name: Debian Package Build
+        id: package_builder
+        run: |
+          mkdir -p release/usr/local/bin/
+          cp scripts/* release/usr/local/bin/
+          mkdir release/DEBIAN
+          touch release/DEBIAN/control
+          touch release/DEBIAN/md5sums
+          find scripts -type f -exec md5sum {} \; > release/DEBIAN/md5sums
+
+          size=$(du -s scripts | cut -f 1)
+          version=$(date +'%Y%m%d-%H%M%S')
+          
+          package_name="lapsamba"
+          osversion="ondokuz"
+          urgency="high"
+          release_version="ver"$(cat release-info | awk -F " " '{print $1}')
+          release_changes=$(cat release-info | awk -F " " '{$1="";print $0;}')
+
+
+          echo "::set-output name=release_version::$release_version"
+          echo "::set-output name=release_changes::$release_changes"
+
+          echo "Package: $package_name
+          Version: ${{steps.date.outputs.date}}
+          Installed-Size: $size
+          Maintainer: Ozgun Kultekin <ozgunkultekin@gmail.com>
+          Priority: optional
+          Recommends: ldb-tools
+          Date : $GITHUB_RUN_ID
+          Architecture: amd64
+          Description: LAPS for Samba-AD
+          " > release/DEBIAN/control
+
+          touch release/DEBIAN/postinst
+          chmod 755 release/DEBIAN/postinst
+
+          mv release $package_name-${{steps.date.outputs.date}}
+          dpkg-deb -Zgzip --build $package_name-${{steps.date.outputs.date}}
+
+          echo ::set-output name=path::$package_name-${{steps.date.outputs.date}}.deb
+          echo ::set-output name=filename::$package_name-${{steps.date.outputs.date}}.deb
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{steps.date.outputs.date}}
+          release_name: ${{steps.date.outputs.date}}
+          body: |
+            Changes in this Release
+            - Version: ${{ steps.package_builder.outputs.release_version }}
+            - ${{ steps.package_builder.outputs.release_changes }}
+          draft: false
+          prerelease: false
+
+      - name: Upload the Debian package to Release Assets
+        id: upload-release-asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ${{ steps.package_builder.outputs.path }}
+          asset_name: ${{ steps.package_builder.outputs.filename }}
+          asset_content_type: application/vnd.debian.binary-package
+
+      - name: Update version
+        id: version_updater
+        run: |
+          cat release-info | awk -F " " '{$1=$1+1; print $0}' > temp.txt
+          cat temp.txt > release-info
+          rm temp.txt
+          git config --local user.email ${{ secrets.GIT_EMAIL }} 
+          git config --local user.name "oz9un"
+          git add release-info
+          git commit -m 'version updated'
+      - name: Push changes
+        uses: ad-m/github-push-action@master
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
